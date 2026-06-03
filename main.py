@@ -1,53 +1,50 @@
 import streamlit as st
 import pandas as pd
 import networkx as nx
+import matplotlib.pyplot as plt
 
 st.title("Виявлення критичних вузлів мережі")
 
-uploaded_file = st.file_uploader("Завантажте CSV файл", type=["csv"])
+# 1. Вбудовані дані (замість CSV)
+data = {
+    "source": ["Server-1", "Server-1", "Router-1", "Router-1", "PC-2", "PC-3"],
+    "target": ["PC-1", "PC-2", "PC-3", "Server-2", "Server-2", "PC-1"]
+}
+df = pd.DataFrame(data)
 
-if uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file)
+st.write("### 📋 Аналізована топологія мережі:")
+st.table(df)
 
-        if df.shape[1] < 2:
-            st.error("CSV-файл повинен містити щонайменше два стовпці.")
-            st.stop()
+# 2. Побудова графа
+G = nx.Graph()
+for _, row in df.iterrows():
+    G.add_edge(row["source"], row["target"])
 
-        df = df.iloc[:, :2]
-        df.columns = ["source", "target"]
+# 3. Розрахунок центральності
+degree = nx.degree_centrality(G)
+betweenness = nx.betweenness_centrality(G)
+closeness = nx.closeness_centrality(G)
 
-    except Exception as e:
-        st.error(f"Помилка зчитування файлу: {e}")
-        st.stop()
+# 4. Формування таблиці результатів
+result = pd.DataFrame({
+    "Вузол": list(G.nodes()),
+    "Degree": [degree[n] for n in G.nodes()],
+    "Betweenness": [betweenness[n] for n in G.nodes()],
+    "Closeness": [closeness[n] for n in G.nodes()]
+})
 
-    st.write("Вхідні дані:")
-    st.write(df)
+st.write("### 📊 Показники центральності:")
+st.dataframe(result)
 
-    G = nx.Graph()
+# 5. Визначення та виведення критичних вузлів
+top_nodes = result.sort_values(by="Betweenness", ascending=False).head(3)
 
-    for _, row in df.iterrows():
-        G.add_edge(row["source"], row["target"])
+st.write("### ⚠️ Найбільш критичні вузли (за Betweenness):")
+st.table(top_nodes)
 
-    st.write(f"Кількість вузлів: {G.number_of_nodes()}")
-    st.write(f"Кількість ребер: {G.number_of_edges()}")
-
-    degree = nx.degree_centrality(G)
-    betweenness = nx.betweenness_centrality(G)
-    closeness = nx.closeness_centrality(G)
-
-    result = pd.DataFrame({
-        "Вузол": list(G.nodes()),
-        "Degree": [degree[n] for n in G.nodes()],
-        "Betweenness": [betweenness[n] for n in G.nodes()],
-        "Closeness": [closeness[n] for n in G.nodes()]
-    })
-
-    st.write("Показники центральності:")
-    st.write(result)
-
-    top_nodes = result.sort_values(by="Betweenness", ascending=False).head(3)
-
-    st.write("Найбільш критичні вузли:")
-    st.write(top_nodes)
+# 6. Візуалізація
+st.write("### 🗺 Візуальна схема мережі:")
+fig, ax = plt.subplots()
+nx.draw(G, with_labels=True, node_color='lightgreen', node_size=1500, font_weight='bold', ax=ax)
+st.pyplot(fig)
 
